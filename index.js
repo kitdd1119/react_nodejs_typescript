@@ -2,6 +2,9 @@ const express = require('express');
 const app = express();
 const port = 5000;
 const bodyParser = require('body-parser');
+
+const config = require('./config/key');
+
 const { User } = require("./models/User");
 
 // application/x-www-form-urlencoded 타입으로 된 것을 분석해서 가져오도록 함
@@ -12,12 +15,12 @@ app.use(bodyParser.json());
 
 
 const mongoose = require('mongoose');
-mongoose.connect('mongodb+srv://kitdd1119:qwe123@reactdb.m0qntcs.mongodb.net/?retryWrites=true&w=majority', {
+mongoose.connect(config.mongoURI, {
 }).then(() => console.log('MongoDB 연결중...'))
   .catch(err => console.log(err))
 
 
-app.get('/', (req, res) => res.send('Hello'))
+app.get('/', (req, res) => res.send('Hello asdasd'))
 
 app.post('/register', async (req, res) => {
   try {
