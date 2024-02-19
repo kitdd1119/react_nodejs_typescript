@@ -10,7 +10,7 @@ const { User } = require("./models/User");
 // application/x-www-form-urlencoded 타입으로 된 것을 분석해서 가져오도록 함
 app.use(bodyParser.urlencoded({ extended: true }));
 
-//application/json 타입으로 된 것을 분석해서 가져오도록 함
+// application/json 타입으로 된 것을 분석해서 가져오도록 함
 app.use(bodyParser.json());
 app.use(cookieParser());
 
@@ -18,7 +18,6 @@ const mongoose = require('mongoose');
 mongoose.connect(config.mongoURI, {
 }).then(() => console.log('MongoDB 연결중...'))
   .catch(err => console.log(err))
-
 
 app.get('/', (req, res) => res.send('Hello asdasd'))
 
@@ -28,14 +27,28 @@ app.get('/api/hello', (req,res) => {
 
 app.post('/api/users/register', async (req, res) => {
   try {
-    // 회원가입 시 필요한 정보들을 client에서 가져오면 그것들을 데이터 베이스에 넣도록
-    const user = new User(req.body);
-    const userInfo = await user.save();
-    return res.status(200).json({ success: true })
+    const { email, name, password, confirmPassword } = req.body;
+    if (!email || !name || !password || !confirmPassword) {
+      return res.status(400).json({ success: false, message: "모든 필드를 입력해주세요." });
+    }
+    if (password !== confirmPassword) {
+      return res.status(400).json({ success: false, message: "비밀번호가 일치하지 않습니다." });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: "해당 이메일은 이미 사용 중입니다." });
+    }
+
+    const user = new User({ email, name, password });
+    await user.save();
+
+    return res.status(200).json({ success: true, registerSuccess: true, message: "회원가입에 성공했습니다." });
   } catch (err) {
-    return res.json({ success: false, err })
+    console.error("회원가입 중 오류:", err);
+    return res.status(500).json({ success: false, message: "회원가입 중 오류가 발생했습니다." });
   }
-})
+});
 
 app.post('/api/users/login', async (req, res) => {
   try {
@@ -53,7 +66,9 @@ app.post('/api/users/login', async (req, res) => {
     }
 
     const token = await user.generateToken();
-    res.cookie("x_auth", token)
+
+    // 쿠키에 JWT를 설정합니다.
+    res.cookie("x_auth", token, { httpOnly: true })
       .status(200)
       .json({ loginSuccess: true, userId: user._id });
   } catch (err) {
@@ -81,19 +96,16 @@ app.get('/api/users/auth', auth, (req, res) => {
 
 app.get('/api/users/logout', auth, async (req, res) => {
   try {
-    // 사용자의 토큰을 삭제하기 위해 findOneAndUpdate 메서드를 사용함
-    const updatedUser = await User.findOneAndUpdate(
-      { _id: req.user._id }, // 해당 사용자를 찾기 위해 ID를 사용함
-      { token: "" }, // 토큰을 빈 문자열로 업데이트하여 삭제함
-      { new: true } // 업데이트 후의 사용자 정보를 반환함
-    );
+    // 사용자의 토큰을 삭제합니다.
+    req.user.token = "";
+    await req.user.save();
     
-    // 로그아웃이 성공적으로 이루어졌음을 알리는 응답을 보냄
-    return res.clearCookie('x_auth').status(200).send({
+    // 클라이언트에게 쿠키를 비워 응답합니다.
+    res.clearCookie('x_auth').status(200).send({
       success: true
     });
   } catch (err) {
-    // 오류가 발생한 경우 오류 응답을 보냄
+    // 오류가 발생한 경우 오류 응답을 보냅니다.
     console.error("로그아웃 중 오류가 발생했습니다.", err);
     return res.status(500).json({ success: false, error: "로그아웃 중 오류가 발생했습니다." });
   }
